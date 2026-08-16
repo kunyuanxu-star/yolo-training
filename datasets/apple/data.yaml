@@ -1,0 +1,6 @@
+﻿path: ./datasets/apple
+train: train/images
+val: val/images
+names:
+  0: apple
+

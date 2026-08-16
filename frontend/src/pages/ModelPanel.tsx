@@ -1,0 +1,140 @@
+import { useState } from 'react';
+import { Trash2, GitCompare } from 'lucide-react';
+import type { TrainedModel, TrainingJob } from '../types';
+import { models as modelApi } from '../api/endpoints';
+import ModelComparePanel from '../components/ModelComparePanel';
+
+interface Props {
+  models: TrainedModel[];
+  jobs: TrainingJob[];
+  onSelect: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
+  onCancelJob: (id: string) => void;
+}
+
+export default function ModelPanel({ models: list, jobs = [], onSelect, onDelete, onCancelJob }: Props) {
+  const [compareMode, setCompareMode] = useState(false);
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-800">模型</h3>
+        <button onClick={() => setCompareMode(!compareMode)}
+          className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg font-medium transition-all
+            ${compareMode ? 'bg-violet-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+          <GitCompare size={12} /> 对比
+        </button>
+      </div>
+
+      {compareMode && (
+        <div className="mb-4">
+          <ModelComparePanel
+            availableModels={list}
+            onClose={() => setCompareMode(false)}
+          />
+        </div>
+      )}
+
+      {/* 活跃的训练任务 */}
+      {(jobs || []).filter(j => j.status === 'running' || j.status === 'queued').map(job => {
+        const model = (list || []).find(m => m.id === job.model_id);
+        return (
+          <div key={job.id} className="bg-white rounded-xl border border-purple-200 shadow-sm p-4 mb-3 group">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${job.status === 'running' ? 'bg-purple-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span className="text-sm font-medium text-gray-700">{model?.name || '训练中'}</span>
+                <span className="text-xs text-gray-400">{job.status === 'running' ? '训练中' : '排队中'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-mono">{job.progress.toFixed(0)}%</span>
+                <button onClick={() => onCancelJob(job.id)}
+                  className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  title="取消训练">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
+              <div className="h-full bg-purple-500 rounded-full transition-all duration-500" style={{ width: `${job.progress}%` }} />
+            </div>
+            <p className="text-xs text-gray-500 font-mono">Epoch {job.current_epoch} / {job.total_epochs}</p>
+            {job.current_metric && (
+              <div className="grid grid-cols-3 gap-1.5 mt-3">
+                {Object.entries(job.current_metric).slice(0, 6).map(([k, v]) => (
+                  <div key={k} className="bg-gray-50 rounded p-1.5 text-center">
+                    <div className="text-[9px] text-gray-500 truncate leading-tight">{k}</div>
+                    <div className="text-[11px] font-bold text-purple-600 font-mono">{typeof v === 'number' ? v.toFixed(4) : String(v)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* 已完成的模型 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {(list || []).filter(m => m.status === 'completed').map(m => (
+          <div key={m.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-all group">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-800 text-sm cursor-pointer" onClick={() => onSelect(m.id)}>{m.name}</h4>
+              <div className="flex items-center gap-1">
+                {m.format_type && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-medium">{m.format_type.replace('_', ' ').toUpperCase()}</span>}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">done</span>
+                <button onClick={(e) => { e.stopPropagation(); onDelete(m.id, m.name); }}
+                  className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  title="删除模型">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+            {m.metrics && (
+              <div className="grid grid-cols-3 gap-2">
+                {Object.entries(m.metrics).slice(0, 3).map(([k, v]) => (
+                  <div key={k} className="bg-gray-50 rounded p-2 text-center">
+                    <div className="text-[10px] text-gray-500">{k}</div>
+                    <div className="text-xs font-bold text-violet-600 font-mono">{typeof v === 'number' ? v.toFixed(3) : String(v)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-3">
+              {m.weights_path && !m.parent_model_id && (
+                <>
+                  <a href={modelApi.downloadUrl(m.id, 'pt')} onClick={e => e.stopPropagation()}
+                    className="px-3 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700 font-medium">下载 PT</a>
+                  <button onClick={(e) => { e.stopPropagation(); onSelect(m.id); }}
+                    className="px-3 py-1 text-xs rounded bg-violet-600 text-white hover:bg-violet-700 font-medium cursor-pointer">转换</button>
+                </>
+              )}
+              {m.weights_path && m.parent_model_id && (
+                <a href={modelApi.downloadUrl(m.id, m.format_type || 'onnx')} onClick={e => e.stopPropagation()}
+                  className="px-3 py-1 text-xs rounded bg-violet-600 text-white hover:bg-violet-700 font-medium">下载 {m.format_type?.replace('_', ' ').toUpperCase()}</a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 其他状态的模型 */}
+      {(list || []).filter(m => m.status !== 'completed').map(m => (
+        <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3 mt-2 group">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">{m.name}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{m.status}</span>
+          </div>
+          <button onClick={() => onDelete(m.id, m.name)}
+            className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+            title="删除模型">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+
+      {(list || []).length === 0 && (jobs || []).length === 0 && (
+        <div className="text-center py-16 text-gray-400 text-sm">暂无模型，开始训练来创建</div>
+      )}
+    </div>
+  );
+}

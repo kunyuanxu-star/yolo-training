@@ -1,0 +1,33 @@
+extends:
+  - "@commitlint/config-conventional"
+plugins:
+  - references
+
+#禁止Merged、!fixup等Git生成的提交记录合入
+defaultIgnores: true
+
+rules:
+  #允许中文
+  subject-case: [0]
+  # references-empty-enum: [2,"never",["fix", "feat"]]
+  header-max-length: [1, 'always', 72]
+  body-max-length: [1, 'always', 100]
+  type-enum:
+    - 2
+    - always
+    - - build
+      - chore
+      - ci
+      - docs
+      - feat
+      - fix
+      - perf
+      - refactor
+      - revert
+      - style
+      - test
+
+parserPreset:
+  parserOpts:
+    issuePrefixes: ["#"]
+

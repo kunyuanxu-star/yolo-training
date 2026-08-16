@@ -1,0 +1,5 @@
+path: ./datasets/banana
+train: train/images
+val: val/images
+names:
+  0: banana

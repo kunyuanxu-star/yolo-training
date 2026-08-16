@@ -1,0 +1,15 @@
+FROM ultralytics/ultralytics:8.4.117
+
+WORKDIR /workspace
+
+COPY requirements-ci.txt requirements-ci.txt
+RUN python -m pip install --no-cache-dir -r requirements-ci.txt
+
+COPY . .
+
+ENV PYTHONPATH=/workspace
+ENV YOLO_EPOCHS=10
+ENV YOLO_BATCH=16
+ENV YOLO_IMGSZ=640
+
+CMD ["python", "-m", "training_engine.train", "--model", "yolov8n.pt", "--data", "datasets/banana/data.yaml", "--epochs", "100", "--device", "0"]
